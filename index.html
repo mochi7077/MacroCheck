@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>每日營養素達標小工具</title>
+  <style>
+    :root{
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827; /* gray-900 */
+      --muted:#94a3b8; /* slate-400 */
+      --text:#e5e7eb; /* gray-200 */
+      --accent:#38bdf8; /* sky-400 */
+      --good:#22c55e; /* green-500 */
+      --warn:#eab308; /* yellow-500 */
+      --bad:#ef4444; /* red-500 */
+      --card:#111827;
+      --border:#1f2937;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,"Noto Sans",sans-serif;background:linear-gradient(160deg,#0b1025,#0f172a 40%,#0b1025);color:var(--text)}
+    .container{max-width:980px;margin:40px auto;padding:24px}
+    .app{background:rgba(17,24,39,.7);border:1px solid var(--border);backdrop-filter:blur(8px);border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:14px;align-items:center;justify-content:space-between}
+    header h1{font-size:20px;margin:0;letter-spacing:0.2px}
+    .badge{font-size:12px;color:#93c5fd;background:#0b3a5a;border:1px solid #1e3a8a;padding:4px 8px;border-radius:999px}
+    .content{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;padding:18px}
+    @media (max-width: 880px){.content{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+    .card h2{font-size:16px;margin:0 0 12px;color:#f1f5f9}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .seg{flex:1 1 120px;background:#0b1222;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .seg small{display:block;color:var(--muted);font-size:11px}
+    .seg strong{display:block;font-size:15px;margin-top:2px}
+    .type-toggle{display:flex;gap:10px;flex-wrap:wrap}
+    .pill{position:relative;border:1px solid var(--border);background:#0b1222;color:#cbd5e1;border-radius:999px;padding:10px 14px;cursor:pointer;user-select:none;transition:transform .04s}
+    .pill:active{transform:scale(.98)}
+    .pill[data-active="true"]{border-color:#075985;background:#082f49;color:#e0f2fe;box-shadow:inset 0 0 0 1px #38bdf8}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    @media (max-width: 560px){.grid{grid-template-columns:1fr}}
+    .input{display:flex;flex-direction:column;gap:6px;background:#0b1222;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .input label{font-size:13px;color:#cbd5e1}
+    .input input{appearance:textfield;width:100%;padding:10px 12px;border:1px solid #0f223e;border-radius:10px;background:#0a1326;color:#e2e8f0}
+    .input input::placeholder{color:#64748b}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    button{border:1px solid #1f314f;background:#0a1b33;color:#e2e8f0;border-radius:12px;padding:10px 14px;cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#0ea5e9,#0284c7);border-color:#075985}
+    button.ghost{background:transparent}
+    .status{display:grid;gap:10px}
+    .status .macro{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--border);background:#0b1222;border-radius:12px;padding:10px 12px}
+    .macro .name{font-weight:600}
+    .macro .delta{font-size:12px;color:var(--muted)}
+    .macro .chip{padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
+    .chip.good{background:rgba(34,197,94,.15);color:#86efac;border-color:#14532d}
+    .chip.warn{background:rgba(234,179,8,.15);color:#fde68a;border-color:#713f12}
+    .chip.bad{background:rgba(239,68,68,.15);color:#fecaca;border-color:#7f1d1d}
+    .bar{height:10px;background:#0a1326;border-radius:999px;overflow:hidden;border:1px solid #0f223e}
+    .bar > span{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#22d3ee);width:0%}
+    .totals{display:grid;gap:10px;margin-top:10px}
+    .totals .box{display:flex;justify-content:space-between;align-items:center;background:#0b1222;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;color:#9ca3af}
+    a{color:#93c5fd}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="app">
+      <header>
+        <h1>每日營養素達標小工具</h1>
+        <div class="badge">純前端・離線可用</div>
+      </header>
+      <div class="content">
+        <!-- 左側：輸入與選擇 -->
+        <section class="card">
+          <h2>1) 今日類型</h2>
+          <div class="type-toggle" id="typeToggle" role="tablist" aria-label="選擇今日類型">
+            <div class="pill" data-type="rest" data-active="true" role="tab" tabindex="0">非運動日</div>
+            <div class="pill" data-type="cardio" role="tab" tabindex="0">有氧日（20 分鐘）</div>
+            <div class="pill" data-type="strength" role="tab" tabindex="0">重訓日（60 分鐘）</div>
+          </div>
+
+          <div style="height:10px"></div>
+          <div class="row">
+            <div class="seg">
+              <small>蛋白質目標</small>
+              <strong id="targetP">110 g</strong>
+            </div>
+            <div class="seg">
+              <small>碳水目標</small>
+              <strong id="targetC">145 g</strong>
+            </div>
+            <div class="seg">
+              <small>脂肪目標</small>
+              <strong id="targetF">45 g</strong>
+            </div>
+            <div class="seg">
+              <small>總熱量（參考）</small>
+              <strong id="targetKcal">1600 kcal</strong>
+            </div>
+          </div>
+
+          <div style="height:18px"></div>
+          <h2>2) 今日已吃（克）</h2>
+          <div class="grid">
+            <div class="input">
+              <label for="p">蛋白質 (g)</label>
+              <input id="p" type="number" inputmode="decimal" placeholder="例如 75" min="0" step="0.1" />
+            </div>
+            <div class="input">
+              <label for="c">碳水 (g)</label>
+              <input id="c" type="number" inputmode="decimal" placeholder="例如 120" min="0" step="0.1" />
+            </div>
+            <div class="input">
+              <label for="f">脂肪 (g)</label>
+              <input id="f" type="number" inputmode="decimal" placeholder="例如 40" min="0" step="0.1" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="calcBtn">計算</button>
+            <button class="ghost" id="clearBtn" title="清除目前輸入">清除</button>
+          </div>
+
+          <p class="small muted" style="margin-top:6px">熱量換算：蛋白質 4 kcal/g、碳水 4 kcal/g、脂肪 9 kcal/g；僅供自我追蹤參考。</p>
+        </section>
+
+        <!-- 右側：結果與狀態 -->
+        <section class="card">
+          <h2>3) 今日達標狀態</h2>
+          <div class="status" id="status">
+            <!-- 動態填入宏狀態卡片 -->
+          </div>
+
+          <div class="totals">
+            <div class="box">
+              <div>
+                <div class="muted small">今日總熱量（由三大營養素計）</div>
+                <div style="font-weight:700;font-size:20px" id="actualKcal">0 kcal</div>
+              </div>
+              <div style="text-align:right">
+                <div class="muted small">參考目標</div>
+                <div id="goalKcal" style="font-weight:600">1600 kcal</div>
+              </div>
+            </div>
+            <div class="box" id="summaryBox">
+              <div id="summaryText">尚未計算</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <span class="small">v1.0 · 本工具不搜集任何資料（使用者資料僅存於瀏覽器 LocalStorage）。</span>
+        <span class="small">建議每日纖維 ≥ 20 g，飲水 ≥ 2000 ml。</span>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const TYPES = {
+      rest: { name: '非運動日', P:110, C:145, F:45, kcal:1600 },
+      cardio: { name: '有氧日（20 分鐘）', P:115, C:165, F:45, kcal:1700 },
+      strength: { name: '重訓日（60 分鐘）', P:120, C:180, F:47, kcal:1800 },
+    };
+
+    const els = {
+      targetP: document.getElementById('targetP'),
+      targetC: document.getElementById('targetC'),
+      targetF: document.getElementById('targetF'),
+      targetKcal: document.getElementById('targetKcal'),
+      goalKcal: document.getElementById('goalKcal'),
+      p: document.getElementById('p'),
+      c: document.getElementById('c'),
+      f: document.getElementById('f'),
+      calcBtn: document.getElementById('calcBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      status: document.getElementById('status'),
+      actualKcal: document.getElementById('actualKcal'),
+      summaryText: document.getElementById('summaryText'),
+    };
+
+    // 狀態
+    let currentType = localStorage.getItem('macro.type') || 'rest';
+
+    // 初始化類型 pill 樣式
+    const typeToggle = document.getElementById('typeToggle');
+    typeToggle.querySelectorAll('.pill').forEach(pill => {
+      pill.dataset.active = (pill.dataset.type === currentType);
+      pill.addEventListener('click', () => switchType(pill.dataset.type));
+      pill.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); switchType(pill.dataset.type);} })
+    });
+
+    function switchType(type){
+      if(!TYPES[type]) return;
+      currentType = type;
+      localStorage.setItem('macro.type', type);
+      typeToggle.querySelectorAll('.pill').forEach(p=> p.dataset.active = (p.dataset.type===type));
+      const t = TYPES[type];
+      els.targetP.textContent = t.P + ' g';
+      els.targetC.textContent = t.C + ' g';
+      els.targetF.textContent = t.F + ' g';
+      els.targetKcal.textContent = t.kcal + ' kcal';
+      els.goalKcal.textContent = t.kcal + ' kcal';
+      // 重算一次
+      calculate();
+    }
+
+    // 載入上次輸入
+    ['p','c','f'].forEach(k=>{
+      const v = localStorage.getItem('macro.'+k);
+      if(v!==null) els[k].value = v;
+      els[k].addEventListener('input', ()=> localStorage.setItem('macro.'+k, els[k].value));
+    });
+
+    els.calcBtn.addEventListener('click', calculate);
+    els.clearBtn.addEventListener('click', ()=>{
+      els.p.value = els.c.value = els.f.value = '';
+      ['p','c','f'].forEach(k=> localStorage.removeItem('macro.'+k));
+      calculate();
+    });
+
+    function kcalFrom(p,c,f){
+      return p*4 + c*4 + f*9;
+    }
+
+    function macroCard(label, actual, target){
+      const diff = +(actual - target).toFixed(1);
+      const abs = Math.abs(diff);
+      let chipClass = 'warn', chipText = '未達標';
+      if(abs < 0.5){ chipClass = 'good'; chipText = '✅ 達標'; }
+      else if(diff > 0){ chipClass = 'bad'; chipText = '⬆️ 超過 ' + abs + ' g'; }
+      else { chipClass = 'warn'; chipText = '⬇️ 未達 ' + abs + ' g'; }
+
+      const percent = Math.min(100, Math.max(0, target ? (actual/target*100) : 0));
+      const bar = `<div class="bar"><span style="width:${percent}%"></span></div>`;
+
+      return `
+        <div class="macro">
+          <div>
+            <div class="name">${label}</div>
+            <div class="delta">今日：<strong>${actual.toFixed(1)} g</strong>／目標：<strong>${target.toFixed(1)} g</strong></div>
+            ${bar}
+          </div>
+          <div class="chip ${chipClass}">${chipText}</div>
+        </div>
+      `;
+    }
+
+    function calculate(){
+      const t = TYPES[currentType];
+      const p = parseFloat(els.p.value)||0;
+      const c = parseFloat(els.c.value)||0;
+      const f = parseFloat(els.f.value)||0;
+
+      const kcal = kcalFrom(p,c,f);
+      els.actualKcal.textContent = kcal.toFixed(0) + ' kcal';
+
+      const html = [
+        macroCard('蛋白質', p, t.P),
+        macroCard('碳水', c, t.C),
+        macroCard('脂肪', f, t.F),
+      ].join('');
+      els.status.innerHTML = html;
+
+      const hitP = Math.abs(p - t.P) < 0.5;
+      const hitC = Math.abs(c - t.C) < 0.5;
+      const hitF = Math.abs(f - t.F) < 0.5;
+      const hitK = Math.abs(kcal - t.kcal) < 25; // 允許 ±25 kcal 視為達標
+
+      let summary = `今日類型：<strong>${t.name}</strong>。`;
+      const checks = [];
+      checks.push('蛋白質' + (hitP ? '✅' : (p>t.P?'⬆️':'⬇️')));
+      checks.push('碳水' + (hitC ? '✅' : (c>t.C?'⬆️':'⬇️')));
+      checks.push('脂肪' + (hitF ? '✅' : (f>t.F?'⬆️':'⬇️')));
+      checks.push('熱量' + (hitK ? '✅' : (kcal>t.kcal?'⬆️':'⬇️')));
+      summary += ' 狀態：' + checks.join('、') + '。';
+
+      if(!p && !c && !f) summary = '尚未輸入數據。請先輸入今日三大營養素（克）。';
+      document.getElementById('summaryText').innerHTML = summary;
+    }
+
+    // 初始類型與畫面
+    switchType(currentType);
+    calculate();
+  </script>
+</body>
+</html>
